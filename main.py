@@ -111,11 +111,11 @@ def format_plot(fig, title, xaxis_title, yaxis_title, color):
         title=title,
         xaxis_title=xaxis_title,
         yaxis_title=yaxis_title,
-        plot_bgcolor='rgba(233, 236, 239, 0.5)',  # Light gray background for plot area
-        paper_bgcolor='rgba(233, 236, 239, 1)',   # Slightly darker gray for the surrounding area
-        font=dict(color="black", size=12),
+        # plot_bgcolor='rgba(233, 236, 239, 0.5)',  # Light gray background for plot area
+        # paper_bgcolor='rgba(233, 236, 239, 1)',   # Slightly darker gray for the surrounding area
+        # font=dict(color="black", size=12),
         margin=dict(t=60, l=50, r=50, b=50),  # Adjust margins to prevent clipping
-        title_font=dict(size=16, color=color),  # Stylish title
+        # title_font=dict(size=16, color=color),  # Stylish title
     )
     return fig
 
@@ -167,25 +167,75 @@ def main():
     st.title("Sports Bar KPIs and Forecasts")
     
     # Declare sidebar components
-    starting_date = st.sidebar.date_input(label="Start Date (through 11/30/2023)", value=datetime(2019, 1, 1))
+    starting_date = st.sidebar.date_input(label="Start Date (through Today)", value=datetime(2019, 1, 1))
     forecast_days = st.sidebar.number_input(label="How many days to forecast ahead (max 120)", value=60, placeholder="Enter a number of days to predict...")
     gen_data = st.sidebar.button("Generate data")
     train_model = st.sidebar.checkbox("Train a machine learning model with the data")
 
-    end_date = datetime(2023, 11, 30)
+    end_date = datetime.now().date()
     restaurant_data = generate_restaurant_data(starting_date, end_date)
 
     if gen_data:
     
         # Creating plots
-        line_graph_sales = go.Figure(data=[go.Scatter(x=restaurant_data['Date'], y=restaurant_data['Sales'], mode='lines+markers')])
-        bar_chart_traffic = go.Figure(data=[go.Bar(x=restaurant_data['Date'], y=restaurant_data['Foot Traffic'])])
+        #line_graph_sales = go.Figure(data=[go.Scatter(x=restaurant_data['Date'], y=restaurant_data['Sales'], mode='lines+markers')])
+        #bar_chart_traffic = go.Figure(data=[go.Bar(x=restaurant_data['Date'], y=restaurant_data['Foot Traffic'])])
         scatter_sales_traffic = go.Figure(data=[go.Scatter(x=restaurant_data['Foot Traffic'], y=restaurant_data['Sales'], mode='markers')])
+        window_size = 14  # Adjust the window size for smoother trends
+        line_graph_sales = go.Figure(data=[
+            go.Scatter(x=restaurant_data['Date'], y=restaurant_data['Sales'], mode='lines+markers'),
+            go.Scatter(x=restaurant_data['Date'], y=restaurant_data['Sales'].rolling(window=window_size).mean(), mode='lines', name='Trendline', line=dict(color='red'))
+        ])
+        line_graph_sales.update_layout(title='Sales Over Time with Trendline',
+                                    xaxis_title='Date',
+                                    yaxis_title='Sales')
+        
+        bar_chart_traffic = go.Figure(data=[
+            go.Bar(x=restaurant_data['Date'], y=restaurant_data['Foot Traffic']),
+            go.Scatter(x=restaurant_data['Date'], y=restaurant_data['Foot Traffic'].rolling(window=window_size).mean(), mode='lines', name='Trendline', line=dict(color='red'))
+        ])
+        bar_chart_traffic.update_layout(title='Foot Traffic Over Time with Trendline',
+                                        xaxis_title='Date',
+                                        yaxis_title='Foot Traffic')
         
         # Track cumulative sales
         restaurant_data['Cumulative Sales'] = restaurant_data['Sales'].cumsum()
-        area_chart_cumulative_sales = go.Figure(data=[go.Scatter(x=restaurant_data['Date'], y=restaurant_data['Cumulative Sales'], fill='tozeroy')])
+        # area_chart_cumulative_sales = go.Figure(data=[go.Scatter(x=restaurant_data['Date'], y=restaurant_data['Cumulative Sales'], fill='tozeroy')])
+
+        # Sales by year plot
+        restaurant_data['Year'] = restaurant_data['Date'].dt.year
+        # Group data by year and calculate cumulative sales for each year
+        yearly_cumulative_sales = restaurant_data.groupby('Year')['Cumulative Sales'].max()
+        bar_chart_cumulative_sales = go.Figure(data=[go.Bar(x=yearly_cumulative_sales.index, y=yearly_cumulative_sales)])
+        bar_chart_cumulative_sales = go.Figure(data=[
+            go.Bar(x=yearly_cumulative_sales.index, y=yearly_cumulative_sales),
+            go.Scatter(x=yearly_cumulative_sales.index, y=yearly_cumulative_sales, mode='lines', name='Trendline', line=dict(color='red'))
+        ])
+
+        # Average sale by day
+        restaurant_data['Day'] = restaurant_data['Date'].dt.day_name()
+        # Group data by day and calculate average sales for each day
+        average_sales_by_day = restaurant_data.groupby('Day')['Sales'].mean()
+        days_order = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+        # Horizontal bar plot with ordered days
+        horizontal_bar_chart_average_sales = go.Figure(data=[go.Bar(y=average_sales_by_day.index, x=average_sales_by_day, orientation='h')])
+        horizontal_bar_chart_average_sales.update_layout(title='Average Sales Per Day',
+                                                        xaxis_title='Average Sales',
+                                                        yaxis_title='Day',
+                                                        yaxis=dict(categoryorder='array', categoryarray=days_order),
+                                                        height=400, width=600)
         
+        # Group data by day and calculate average foot traffic for each day
+        average_foot_traffic_by_day = restaurant_data.groupby('Day')['Foot Traffic'].mean()
+        # Horizontal bar plot with ordered days
+        horizontal_bar_chart_average_foot_traffic = go.Figure(data=[go.Bar(y=average_foot_traffic_by_day.index, x=average_foot_traffic_by_day, orientation='h')])
+        horizontal_bar_chart_average_foot_traffic.update_layout(title='Average Foot Traffic Per Day',
+                                                                xaxis_title='Average Foot Traffic',
+                                                                yaxis_title='Day',
+                                                                yaxis=dict(categoryorder='array', categoryarray=days_order),
+                                                                height=400, width=600)
+
+     
         # Summing up the sales volumes for each popular item
         item_sales = restaurant_data[['Popular Item 1 Volume', 'Popular Item 2 Volume', 'Popular Item 3 Volume']].sum()
         # Creating a pie chart using Plotly
@@ -202,7 +252,8 @@ def main():
         line_graph_sales = format_plot(line_graph_sales, 'Sales Over Time', 'Date', 'Sales', 'blue')
         bar_chart_traffic = format_plot(bar_chart_traffic, 'Foot Traffic Over Time', 'Date', 'Foot Traffic', 'orange')
         scatter_sales_traffic = format_plot(scatter_sales_traffic, 'Sales vs Foot Traffic', 'Foot Traffic', 'Sales', 'green')
-        area_chart_cumulative_sales = format_plot(area_chart_cumulative_sales, 'Cumulative Sales Over Time', 'Date', 'Cumulative Sales', 'red')
+        bar_chart_cumulative_sales = format_plot(bar_chart_cumulative_sales, 'Sales by Year', 'Year', 'Sales', 'red')
+        # area_chart_cumulative_sales = format_plot(area_chart_cumulative_sales, 'Cumulative Sales Over Time', 'Date', 'Cumulative Sales', 'red')
         multi_line_food_sales = format_plot(multi_line_food_sales, 'Individual Food Sales Over Time', 'Date', 'Sales', 'violet')
 
         # Calculate KPIs
@@ -234,8 +285,8 @@ def main():
                 st.markdown("### Sales vs Traffic")
                 st.write(scatter_sales_traffic)
             with plot4:
-                st.markdown("### Cumulative Sales")
-                st.write(area_chart_cumulative_sales)
+                st.markdown("### Sales by Year")
+                st.write(bar_chart_cumulative_sales)
             
             plot5,plot6 = st.columns(2)
             with plot5:
@@ -244,6 +295,14 @@ def main():
             with plot6:
                 st.markdown("### Item Sales Over Time")
                 st.write(multi_line_food_sales)
+
+            plot6,plot7 = st.columns(2)
+            with plot6:
+                st.markdown("### Average Sales by Day")
+                st.write(horizontal_bar_chart_average_sales)
+            with plot7:
+                st.markdown("### Average Foot Traffic by Day")
+                st.write(horizontal_bar_chart_average_foot_traffic)
 
             st.markdown("### Detailed Restaurant Data View")
             st.dataframe(restaurant_data.sort_values(by='Date', ascending=False), use_container_width=True, hide_index=True)
