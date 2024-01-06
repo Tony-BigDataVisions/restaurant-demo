@@ -223,7 +223,7 @@ def main():
                                                         xaxis_title='Average Sales',
                                                         yaxis_title='Day',
                                                         yaxis=dict(categoryorder='array', categoryarray=days_order),
-                                                        height=400, width=600)
+                                                        height=400, width=500)
         
         # Group data by day and calculate average foot traffic for each day
         average_foot_traffic_by_day = restaurant_data.groupby('Day')['Foot Traffic'].mean()
@@ -233,7 +233,7 @@ def main():
                                                                 xaxis_title='Average Foot Traffic',
                                                                 yaxis_title='Day',
                                                                 yaxis=dict(categoryorder='array', categoryarray=days_order),
-                                                                height=400, width=600)
+                                                                height=400, width=500)
 
      
         # Summing up the sales volumes for each popular item
